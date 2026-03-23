@@ -1,0 +1,10 @@
+\begin{abstract}
+Large language models produce fluent but often predictable creative writing.
+We ask whether a single LLM can meaningfully improve its own stories through self-critique---generating a story, critiquing it against a structured rubric, and revising---without any external feedback.
+We conduct a controlled study using \gptfour as writer, critic, and blind pairwise judge across 15 diverse fiction prompts drawn from the \writingprompts dataset, comparing six conditions: direct generation (baseline), one to three iterations of \selfrefine, \bestofn self-selection, and \bestofn combined with refinement.
+A single \critiquerevise iteration achieves an 80\% win rate over uncritiqued baselines ($p < 0.001$, Cohen's $d = 2.02$), with the largest gains in creativity (+0.93 on a 5-point scale) and character development (+0.87).
+However, additional iterations yield diminishing returns: the second adds marginal benefit and the third shows signs of regression, particularly in coherence.
+Strikingly, \bestofn self-selection \emph{without} critique is largely ineffective (60\% win rate, $p = 0.80$), demonstrating that the improvement stems from structured critique rather than generation diversity.
+We find no evidence of reward hacking: word count increases only 11\%, while vocabulary richness and n-gram diversity slightly improve.
+These results suggest that LLMs possess latent creative knowledge they do not express in first drafts, and that one round of structured self-reflection is a cost-effective strategy to unlock it.
+\end{abstract}

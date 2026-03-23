@@ -1,0 +1,92 @@
+\section{Methodology}
+\label{sec:method}
+
+\subsection{Task and Dataset}
+\label{sec:dataset}
+
+We study short fiction generation (400--600 words) using prompts from the \writingprompts dataset~\citep{fan2018writingprompts}, a large corpus of creative writing prompts sourced from Reddit.
+We randomly sample 15 diverse prompts (seed $= 42$) from a pool of 5{,}000, covering science fiction, horror, fantasy, literary fiction, and humor.
+Prompt lengths range from 30 to 300 characters.
+While 15 prompts is a modest sample, it is sufficient for detecting the large effects we observe, and we report effect sizes alongside significance tests to contextualize the results.
+
+\subsection{Experimental Conditions}
+\label{sec:conditions}
+
+We compare six conditions, summarized in \tabref{tab:conditions}:
+
+\begin{table}[t]
+\centering
+\caption{Experimental conditions. API calls are counted per prompt.}
+\label{tab:conditions}
+\begin{tabular}{@{}llc@{}}
+\toprule
+\textbf{Condition} & \textbf{Description} & \textbf{API Calls} \\
+\midrule
+\baseline & Direct generation, no critique & 1 \\
+\selfrefine $\times$1 & Generate $\rightarrow$ Critique $\rightarrow$ Revise & 3 \\
+\selfrefine $\times$2 & Two \critiquerevise iterations & 5 \\
+\selfrefine $\times$3 & Three \critiquerevise iterations & 7 \\
+\bestofn ($N\!=\!4$) & Generate 4 stories, self-rank, select best & 5 \\
+\bestofn + Refine & \bestofn, then one \critiquerevise pass & 7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\para{Self-Refine conditions.}
+Following \citet{madaan2023selfrefine}, each iteration consists of three steps: (1)~generate or take the current story, (2)~produce a structured critique identifying specific strengths and weaknesses along six dimensions, and (3)~revise the story addressing the critique.
+We test one to three iterations to measure whether improvement is monotonic.
+
+\para{Best-of-N conditions.}
+To disentangle the effect of critique from mere generation diversity, we generate four independent stories per prompt and have the model rank them.
+We also test combining selection with one refinement pass.
+
+\subsection{Model Configuration}
+\label{sec:config}
+
+We use \gptfour for all roles (generation, critique, and evaluation) with role-specific temperature settings to separate the capacities (\tabref{tab:config}).
+All generation uses seed $= 42$; judging uses seed $= 1042$.
+
+\begin{table}[t]
+\centering
+\caption{Model configuration by role. All roles use \gptfour.}
+\label{tab:config}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Parameter} & \textbf{Generation} & \textbf{Critique} & \textbf{Judging} \\
+\midrule
+Temperature & 0.8 & 0.4 & 0.3 \\
+Max tokens & 800 & 500 & 600 \\
+Seed & 42 & 42 & 1042 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Evaluation Protocol}
+\label{sec:evaluation}
+
+\para{Blind pairwise comparison.}
+For each of the 15 prompts, we compare every non-baseline condition against the baseline in a blind pairwise evaluation.
+The judge receives two stories (labeled ``Story A'' and ``Story B'') with no information about which condition produced them.
+Presentation order is randomized per comparison to control for position bias.
+
+\para{Multi-dimensional scoring.}
+The judge scores each story on six HANNA-inspired dimensions~\citep{chhun2022hanna}, each on a 1--5 scale:
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+    \item \textbf{Coherence}: Plot logic, internal consistency, narrative flow
+    \item \textbf{Creativity}: Originality of ideas, premise, narrative choices
+    \item \textbf{Engagement}: How compelling and readable the story is
+    \item \textbf{Character}: Depth, believability, distinctiveness of characters
+    \item \textbf{Prose Quality}: Writing craft, imagery, word choice, voice
+    \item \textbf{Emotional Impact}: Ability to evoke genuine feelings
+\end{itemize}
+The judge also declares an overall winner or tie.
+
+\para{Reward hacking indicators.}
+To detect superficial quality inflation, we measure word count, vocabulary richness (type-token ratio), and bigram diversity (Distinct-2) across conditions.
+
+\subsection{Statistical Analysis}
+\label{sec:stats}
+
+We use Wilcoxon signed-rank tests for pairwise comparisons of average dimension scores, with Bonferroni correction for five comparisons ($\alpha = 0.01$).
+We report Cohen's $d$ as an effect size measure.
+The total experiment comprises 90 generated stories (15 prompts $\times$ 6 conditions) and 75 pairwise evaluations (15 prompts $\times$ 5 non-baseline conditions).

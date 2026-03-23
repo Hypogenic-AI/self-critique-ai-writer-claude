@@ -1,0 +1,830 @@
+You are an academic paper writer. Generate a complete NEURIPS style paper
+based on the experiment results provided.
+
+════════════════════════════════════════════════════════════════════════════════
+                         IMPORTANT: BEFORE YOU START
+════════════════════════════════════════════════════════════════════════════════
+
+Before writing any content, you MUST complete these steps:
+
+1. READ THE SKILL: Review the paper-writer skill at .claude/skills/paper-writer/SKILL.md
+2. READ THE STYLE GUIDE: Study templates/paper_writing/lab_style_guide.md carefully
+3. REVIEW EXAMPLES: Browse paper_examples/ for formatting and language patterns:
+   - Look at sections/1.introduction.tex for language style
+   - Look at tables/*.tex for table formatting
+   - Look at commands/*.tex for macro usage
+4. VERIFY COMMAND TEMPLATES: Command templates (math.tex, general.tex, macros.tex) are pre-copied to paper_draft/commands/
+
+CRITICAL: Reference example papers for FORMATTING and LANGUAGE STYLE only.
+Do NOT copy content, phrasing, or narrative structure from the example papers.
+The examples are in a different research domain - focus only on presentation style.
+
+════════════════════════════════════════════════════════════════════════════════
+                            EXPERIMENT REPORT
+════════════════════════════════════════════════════════════════════════════════
+
+# Is Self-Critique Enough to Get Good AI Story Writers?
+
+## 1. Executive Summary
+
+**Research Question**: Can an LLM significantly improve its story writing quality by self-critiquing its own output, without any external feedback?
+
+**Key Finding**: Yes — a single round of self-critique (generate → critique → revise) improves story quality by a large margin, with an 80% win rate over uncritiqued baselines in blind pairwise evaluation (p &lt; 0.001, Cohen&#39;s d = 2.02). However, additional iterations yield diminishing returns: the second iteration adds marginal benefit, and the third shows signs of regression. Self-selection without critique (Best-of-N) is largely ineffective.
+
+**Practical Implication**: For AI story writing, one round of structured self-critique is a highly effective, low-cost strategy. More is not better — the &#34;sweet spot&#34; is 1-2 iterations. The improvement comes from the critique-revise loop, not from mere generation diversity.
+
+## 2. Goal
+
+### Hypothesis
+Large language models can significantly improve their story writing abilities by using self-critique as their own reward function, without external feedback.
+
+### Why This Matters
+LLMs are increasingly used for creative writing assistance, but first-draft output quality often plateaus. If self-critique alone can produce meaningful improvement, it enables autonomous quality enhancement without costly human annotation — making high-quality AI writing more accessible.
+
+### Gap in Existing Work
+Prior work has shown self-critique works for tasks with verifiable answers (math, code), but creative writing lacks ground truth. Writing-Zero (2025) demonstrated self-critique for Chinese writing with training-time RL; CRITICS (2024) showed multi-agent critique improves stories; Self-Refine (2023) tested broadly but didn&#39;t deeply analyze creative writing dimensions. No study has systematically measured how much a single LLM improves English narrative fiction across iteration depths using blind evaluation.
+
+## 3. Data Construction
+
+### Dataset
+**WritingPrompts** (Reddit, via HuggingFace `euclaise/writingprompts`)
+- 15 diverse prompts randomly sampled from a pool of 5,000
+- Prompt length: 30-300 characters
+- Genres: sci-fi, horror, fantasy, literary fiction, humor
+- Selection: Random sample with seed=42 for reproducibility
+
+### Example Prompts
+1. &#34;The protagonist, after achieving god-like powers, attempts to overthrow the narrator.&#34;
+2. &#34;A male and female serial killer meet on a dating site, not knowing each other&#39;s true nature.&#34;
+3. &#34;Aliens have taken over the world, and nothing has really changed.&#34;
+
+### Evaluation Rubric (HANNA-inspired)
+Six dimensions scored 1-5 by a blind GPT-4.1 judge:
+- **Coherence**: Plot logic, internal consistency, narrative flow
+- **Creativity**: Originality of ideas, premise, narrative choices
+- **Engagement**: How compelling and readable the story is
+- **Character**: Depth, believability, distinctiveness of characters
+- **Prose Quality**: Writing craft, imagery, word choice, voice
+- **Emotional Impact**: Ability to evoke genuine feelings
+
+## 4. Experiment Description
+
+### Methodology
+
+#### High-Level Approach
+We use GPT-4.1 as both the story writer and self-critic, then evaluate with GPT-4.1 as a blind pairwise judge (separate context, lower temperature, randomized presentation order to control for position bias).
+
+#### Experimental Conditions
+| # | Condition | Description | API Calls/Prompt |
+|---|-----------|-------------|-----------------|
+| 1 | **Baseline** | Direct generation, no critique | 1 |
+| 2 | **Self-Refine ×1** | Generate → Critique → Revise (1 iteration) | 3 |
+| 3 | **Self-Refine ×2** | 2 critique-revise iterations | 5 |
+| 4 | **Self-Refine ×3** | 3 critique-revise iterations | 7 |
+| 5 | **Best-of-4** | Generate 4 stories, self-rank, select best | 5 |
+| 6 | **Best-of-4 + Refine** | Best-of-4, then one critique-revise pass | 7 |
+
+#### Why These Conditions?
+- **Self-Refine ×1-3**: Tests whether iterative self-critique yields monotonic improvement or hits diminishing returns
+- **Best-of-4**: Tests whether self-selection without revision is effective (pure &#34;reward model&#34; usage)
+- **Best-of-4 + Refine**: Tests whether combining selection and revision is superior
+
+### Implementation Details
+
+#### Tools and Libraries
+| Library | Version | Purpose |
+|---------|---------|---------|
+| openai | 1.x | GPT-4.1 API calls |
+| numpy | 2.x | Statistical computation |
+| scipy | 1.17.1 | Wilcoxon signed-rank tests |
+| matplotlib | 3.x | Visualization |
+| seaborn | 0.13.2 | Heatmaps |
+
+#### Model Configuration
+| Parameter | Generation | Critique | Judging |
+|-----------|-----------|----------|---------|
+| Model | GPT-4.1 | GPT-4.1 | GPT-4.1 |
+| Temperature | 0.8 | 0.4 | 0.3 |
+| Max tokens | 800 | 500 | 600 |
+| Seed | 42 | 42 | 1042 |
+
+#### Evaluation Protocol
+- **Blind pairwise comparison**: Each condition&#39;s final story is compared against the baseline story for the same prompt
+- **Position randomization**: Story order (A vs B) is randomized per comparison to control for position bias
+- **Separate context**: The judge has no access to critique history or condition labels
+- **Multi-criteria scoring**: Judge provides per-dimension scores (1-5) plus an overall winner
+
+### Reproducibility
+- Random seed: 42 (all generation), 1042 (judging)
+- 15 prompts × 6 conditions = 90 stories generated
+- 15 prompts × 5 comparisons = 75 pairwise evaluations
+- Hardware: 4× NVIDIA RTX A6000 (not used — API-based experiment)
+- Total API calls: ~550
+- Estimated cost: ~$15-25
+
+## 5. Result Analysis
+
+### Key Finding 1: Self-Critique Produces Large, Statistically Significant Improvement
+
+| Condition | Win% | Tie% | Loss% | Mean Δ Score | p-value | Effect Size (d) | Mean Words |
+|-----------|------|------|-------|-------------|---------|----------------|------------|
+| Self-Refine ×1 | **80%** | 7% | 13% | **+0.66** | **0.001** | **2.02** | 575 |
+| Self-Refine ×2 | **87%** | 7% | 7% | **+0.64** | **0.001** | **1.85** | 577 |
+| Self-Refine ×3 | **80%** | 7% | 13% | **+0.60** | **0.001** | **1.70** | 570 |
+| Best-of-4 | 60% | 0% | 40% | +0.02 | 0.798 | 0.04 | 523 |
+| Best-of-4 + Refine | **87%** | 7% | 7% | **+0.54** | **0.001** | **1.52** | 569 |
+| Baseline | — | — | — | 0.00 | — | — | 518 |
+
+All self-critique conditions (Self-Refine ×1/×2/×3 and Best-of-4 + Refine) beat the baseline with p &lt; 0.002 and very large effect sizes (d &gt; 1.5). The effect is not a statistical artifact — it is robust and consistent.
+
+### Key Finding 2: Diminishing Returns After First Iteration
+
+![Iteration Trajectory](results/plots/iteration_trajectory.png)
+
+The trajectory plot shows a clear pattern:
+- **Iteration 0 → 1**: Large jump (baseline ~4.25 → refined ~4.93 on 5-point scale)
+- **Iteration 1 → 2**: Marginal gain (4.93 → 4.96)
+- **Iteration 2 → 3**: Slight decline (4.96 → 4.91)
+
+This supports hypothesis H2: improvement plateaus quickly. The first critique captures the most actionable feedback; subsequent iterations have less material to improve and may introduce overcorrection.
+
+### Key Finding 3: Self-Selection Alone Is Ineffective
+
+Best-of-4 without refinement achieves only a 60% win rate (barely above chance) and a near-zero score difference (+0.02, p = 0.80). This is a striking contrast with the Self-Refine conditions. The implication: **the critique-revise loop, not generation diversity, drives improvement.** The model is poor at ranking its own stories without structured critique, but excellent at identifying specific weaknesses and fixing them.
+
+However, Best-of-4 + Refine (selection followed by one critique pass) performs as well as pure Self-Refine ×2, achieving 87% win rate. This suggests that starting from a better initial story (via selection) and then refining it is a valid strategy.
+
+### Key Finding 4: Improvement Is Strongest in Creative Dimensions
+
+![Score Differences Heatmap](results/plots/score_diffs_heatmap.png)
+
+Per-dimension analysis reveals where self-critique helps most:
+
+| Dimension | Self-Refine ×1 Δ | Self-Refine ×2 Δ | Self-Refine ×3 Δ |
+|-----------|-----------------|-----------------|-----------------|
+| **Creativity** | **+0.93** | **+1.00** | **+1.00** |
+| **Character** | **+0.87** | **+0.87** | **+0.87** |
+| **Emotional Impact** | **+0.80** | +0.60 | +0.67 |
+| **Prose Quality** | +0.73 | +0.67 | +0.67 |
+| **Engagement** | +0.60 | +0.73 | +0.60 |
+| Coherence | 0.00 | 0.00 | **-0.20** |
+
+Notable patterns:
+- **Creativity and Character** show the largest, most consistent gains (+0.87 to +1.00 points)
+- **Coherence** starts at 0 improvement (baseline is already coherent) and actually *declines* at iteration 3 — a potential sign of overrevision introducing plot inconsistencies
+- Creative dimensions benefit more than structural ones, likely because the critique rubric surfaces specific creative opportunities that the model can act on
+
+### Key Finding 5: Mild Length Inflation, No Style Collapse
+
+![Reward Hacking Indicators](results/plots/text_metrics.png)
+
+| Metric | Baseline | Refine ×1 | Refine ×3 | Change |
+|--------|----------|-----------|-----------|--------|
+| Word count | 518 ± 39 | 575 ± 19 | 570 ± 18 | +11% |
+| Vocab richness | 0.58 | 0.60 | 0.62 | +7% |
+| Distinct-2 | 0.94 | 0.95 | 0.96 | +2% |
+
+- **Length inflation is mild** (+11%), well below the 2.3× inflation reported by Self-Rewarding LMs (Yuan et al., 2024). This is partly because our system prompt constrains story length to 400-600 words.
+- **Vocabulary richness and n-gram diversity increase slightly**, contrary to the style collapse hypothesis. Self-critique appears to push the model toward more varied language, not less.
+- **No evidence of reward hacking** in our setup: quality improvements are not driven by length or superficial elaboration.
+
+### Hypothesis Testing Summary
+
+| Hypothesis | Verdict | Evidence |
+|------------|---------|----------|
+| H1: Self-critique improves quality | **Strongly supported** | 80% win rate, p &lt; 0.001, d = 2.02 |
+| H2: Diminishing returns with iterations | **Supported** | Improvement plateaus at iteration 1, slight decline at 3 |
+| H3: Self-critique introduces reward hacking | **Mostly refuted** | Mild length increase (+11%), diversity actually improves |
+| H4: Best-of-N competitive with refinement | **Refuted** | Best-of-4 alone: 60% win rate; only effective when combined with refinement |
+
+### Surprises and Insights
+
+1. **Self-ranking is surprisingly weak.** Despite the model being able to generate excellent critiques, it struggles to rank stories without structured evaluation criteria. This suggests that critique (identifying specific weaknesses) and ranking (holistic comparison) are different capabilities.
+
+2. **One iteration captures most of the value.** The marginal benefit of iteration 2 is minimal, and iteration 3 may actually hurt. This is practical good news — the cheapest self-critique configuration (3 API calls) captures ~95% of the achievable improvement.
+
+3. **Coherence is a ceiling, not a floor.** GPT-4.1&#39;s baseline stories are already highly coherent (scoring 4-5), so self-critique cannot improve this dimension. Instead, critique helps with the &#34;softer&#34; creative dimensions where there&#39;s more room for improvement.
+
+4. **Creativity gains are the largest.** Self-critique appears to push the model past its default &#34;safe&#34; creative choices, suggesting that the model *knows* what would be more creative but doesn&#39;t produce it by default without prompting.
+
+### Limitations
+
+1. **Same model for generation, critique, and judging.** While we use different temperatures and separate contexts, shared model biases may inflate perceived improvement. A human evaluation study would strengthen these findings.
+
+2. **Inference-time only.** We test refinement at inference time (Self-Refine style), not training-time improvement (DPO/RL). The model doesn&#39;t permanently learn from its critiques — each session starts fresh.
+
+3. **Single model family.** Results are specific to GPT-4.1 and may not generalize to other architectures (e.g., open-source models, smaller models).
+
+4. **Short stories only.** Stories are 400-600 words. Self-critique effectiveness for longer narratives (novels, screenplays) is untested.
+
+5. **15 prompts.** While sufficient for detecting large effects (which we found), a larger sample would provide tighter confidence intervals.
+
+6. **LLM-as-judge limitations.** GPT-4.1 as judge has known biases (verbosity bias, self-enhancement bias). However, position randomization and our &#34;don&#39;t favor longer stories&#34; instruction partially mitigate these.
+
+## 6. Conclusions
+
+### Summary
+Self-critique is a highly effective strategy for improving LLM story writing quality. A single generate-critique-revise loop produces an 80% win rate over uncritiqued baselines, with the largest improvements in creativity (+0.93 points) and character development (+0.87 points). However, additional iterations offer diminishing returns, and self-selection without structured critique is largely ineffective. The &#34;sweet spot&#34; for practical deployment is exactly one critique-revise cycle.
+
+### Implications
+
+**Practical**: Applications using LLMs for creative writing should implement a single self-critique pass by default. This costs only 3× the base generation cost but produces dramatically better output. More than one pass is not cost-effective.
+
+**Theoretical**: The finding that critique-revise works but self-ranking doesn&#39;t suggests that LLMs have latent creative knowledge they don&#39;t express in first drafts. Structured self-reflection unlocks this knowledge more effectively than repeated sampling. This aligns with the &#34;No Free Lunch&#34; literature — internal feedback works when it provides *specific, actionable* information, not just holistic preference signals.
+
+### Confidence in Findings
+**High confidence** in the main finding (self-critique improves stories) given the large effect size, statistical significance, and consistency across prompts. **Moderate confidence** that the improvement is genuine rather than an artifact of LLM-as-judge bias — would be strengthened by human evaluation.
+
+## 7. Next Steps
+
+### Immediate Follow-ups
+1. **Human evaluation study**: Recruit 3-5 human readers for blind pairwise comparison on a subset (10 prompts) to validate LLM-as-judge findings
+2. **Cross-model testing**: Repeat with Claude Sonnet 4.5, Gemini 2.5 Pro, and Llama 3 70B to test generalizability
+3. **Longer stories**: Test on 2000-5000 word stories where structural coherence becomes more challenging
+
+### Alternative Approaches
+- **Training-time self-critique (DPO)**: Use self-critique to generate preference pairs, then fine-tune the model — testing permanent improvement
+- **Multi-agent critique (CRITICS-style)**: Compare single-model critique against specialized critic agents
+- **Rubric ablation**: Test which critique dimensions contribute most to improvement
+
+### Open Questions
+1. Does self-critique effectiveness depend on the model&#39;s baseline quality? (Weaker models may not generate useful critiques)
+2. Can the coherence decline at iteration 3 be prevented with modified critique instructions?
+3. Would a critique-trained specialist model (EvolvR-style) outperform generic self-critique?
+
+## References
+
+1. Jia et al. (2025). Writing-Zero: Bridge the Gap Between Non-verifiable Tasks and Verifiable Rewards. arXiv:2506.00103
+2. Yuan et al. (2024). Self-Rewarding Language Models. arXiv:2401.10020
+3. Bae &amp; Kim (2024). Collective Critics for Creative Story Generation. EMNLP 2024, arXiv:2410.02428
+4. Madaan et al. (2023). Self-Refine: Iterative Refinement with Self-Feedback. arXiv:2303.17651
+5. Bai et al. (2022). Constitutional AI: Harmlessness from AI Feedback. arXiv:2212.08073
+6. Lee et al. (2023). RLAIF vs. RLHF. arXiv:2309.00267
+7. arXiv:2407.04549 (2024). Spontaneous Reward Hacking in Iterative Self-Refinement
+8. Zheng et al. (2023). Judging LLM-as-a-Judge. arXiv:2306.05685
+9. arXiv:2508.06046 (2025). EvolvR: Self-Evolving Pairwise Reasoning for Story Evaluation
+10. Rafailov et al. (2023). Direct Preference Optimization. arXiv:2305.18290
+
+
+════════════════════════════════════════════════════════════════════════════════
+                            RESEARCH PLAN
+════════════════════════════════════════════════════════════════════════════════
+
+# Research Plan: Is Self-Critique Enough to Get Good AI Story Writers?
+
+## Motivation &amp; Novelty Assessment
+
+### Why This Research Matters
+LLMs are increasingly used for creative writing, but their output quality plateaus without external feedback. If self-critique alone can meaningfully improve story quality, it would enable autonomous writing improvement without costly human annotation — democratizing high-quality AI writing assistance.
+
+### Gap in Existing Work
+From the literature review: No paper combines self-critique reward with systematic evaluation specifically for English narrative fiction at inference time across multiple iteration depths. Writing-Zero works on Chinese writing with training-time RL. Self-Refine tested broadly but didn&#39;t deeply analyze creative writing dimensions. CRITICS uses multi-agent critique but doesn&#39;t isolate single-model self-critique effectiveness.
+
+### Our Novel Contribution
+We directly measure how much a single LLM improves its own stories through iterative self-critique, across multiple refinement depths (0-3 iterations) and selection strategies (Best-of-N). We use blind LLM-as-judge evaluation with multi-dimensional rubrics to quantify improvement and detect reward hacking (length inflation, style collapse).
+
+### Experiment Justification
+- **Experiment 1 (Self-Refine iterations)**: Tests whether iterative self-critique yields monotonic improvement or hits diminishing returns / reward hacking.
+- **Experiment 2 (Best-of-N self-selection)**: Tests whether self-ranking multiple generations is more effective than iterative refinement.
+- **Experiment 3 (Reward hacking analysis)**: Measures whether self-critique introduces systematic biases (length, verbosity, cliché).
+
+## Research Question
+Can an LLM significantly improve its story writing quality by self-critiquing its own output, and how does improvement scale with iteration depth?
+
+## Hypothesis Decomposition
+- H1: Self-critique + revision produces stories rated higher than baseline by blind judges.
+- H2: Multiple iterations yield diminishing returns (improvement plateaus or reverses).
+- H3: Self-critique introduces reward hacking artifacts (length inflation, reduced diversity).
+- H4: Best-of-N self-selection is competitive with iterative refinement.
+
+## Proposed Methodology
+
+### Approach
+Use GPT-4.1 via OpenAI API for both generation and self-critique. Evaluate with GPT-4.1 as blind pairwise judge (separate context). Use 30 diverse writing prompts from WritingPrompts dataset.
+
+### Experimental Conditions
+1. **Baseline**: Direct story generation (temperature=0.8)
+2. **Self-Refine x1**: Generate → structured critique → revise
+3. **Self-Refine x2**: Two critique-revise iterations
+4. **Self-Refine x3**: Three critique-revise iterations
+5. **Best-of-4**: Generate 4 stories, self-rank, select best
+6. **Best-of-4 + Refine**: Best-of-4, then one refinement pass
+
+### Critique Rubric (HANNA-inspired)
+Six dimensions scored 1-5:
+- **Coherence**: Plot logic and consistency
+- **Creativity**: Originality of ideas and narrative choices
+- **Engagement**: How compelling and readable the story is
+- **Character**: Depth and believability of characters
+- **Prose Quality**: Writing craft, imagery, voice
+- **Emotional Impact**: Ability to evoke feelings
+
+### Baselines
+- Direct generation (no critique) as primary baseline
+- Human-written stories from WritingPrompts as reference ceiling
+
+### Evaluation Metrics
+1. **Blind pairwise comparison**: Win rate of each condition vs baseline
+2. **Multi-criteria scoring**: 6-dimension rubric scores (1-5 scale)
+3. **Reward hacking indicators**: Word count, distinct-n-gram ratios, vocabulary richness
+
+### Statistical Analysis Plan
+- Paired Wilcoxon signed-rank tests for pairwise comparisons
+- Bonferroni correction for multiple comparisons
+- Effect sizes via rank-biserial correlation
+- Bootstrap 95% confidence intervals
+
+## Expected Outcomes
+- H1 supported: ~60-70% win rate for Self-Refine x1 vs baseline
+- H2 supported: Improvement plateaus around 2 iterations
+- H3 partially supported: Length increases 20-40% across iterations
+- H4: Best-of-N competitive with Self-Refine x1
+
+## Timeline
+- Phase 1 (Planning): 15 min ✓
+- Phase 2 (Setup): 10 min
+- Phase 3 (Implementation): 30 min
+- Phase 4 (Experiments): 60-90 min (API calls)
+- Phase 5 (Analysis): 30 min
+- Phase 6 (Documentation): 20 min
+
+## Potential Challenges
+- API rate limits → batch with delays
+- Cost (~$30-50 for full experiment) → monitor token usage
+- Self-critique may be model-specific → document as limitation
+- Blind judge may share biases with generator → use different temperature/system prompt
+
+## Success Criteria
+Research succeeds if we can quantify the improvement (or lack thereof) from self-critique with statistical confidence and identify the optimal number of iterations.
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          LITERATURE REVIEW
+════════════════════════════════════════════════════════════════════════════════
+
+# Literature Review: Is Self-Critique Enough to Get Good AI Story Writers?
+
+## Research Area Overview
+
+This literature review examines whether large language models (LLMs) can significantly improve their story writing abilities through self-critique as their own reward function, without external human feedback. The research sits at the intersection of three active areas: (1) LLM self-improvement and self-reward mechanisms, (2) AI-assisted creative/story writing, and (3) evaluation of creative text generation.
+
+The field has seen rapid progress in LLM self-improvement for tasks with verifiable answers (math, code), but creative writing poses unique challenges: there is no ground truth, quality is subjective, and evaluation requires aesthetic judgment. Recent work has explored various approaches — from iterative self-refinement at inference time to training-time self-reward loops — with mixed results on whether self-critique alone is sufficient.
+
+---
+
+## Key Papers
+
+### 1. Writing-Zero: Bridge the Gap Between Non-verifiable Tasks and Verifiable Rewards
+- **Authors**: Jia et al. (Alibaba/Quark LLM), 2025
+- **Source**: arXiv:2506.00103
+- **Key Contribution**: Converts subjective writing quality into verifiable pairwise preference signals via a Self-Principled Critique Tuning (SPCT) generative reward model (GenRM), combined with Bootstrapped Relative Policy Optimization (BRPO) that uses within-batch responses as dynamic references.
+- **Methodology**: Two-stage: (1) Train a pairwise GenRM that generates writing-specific evaluation principles, critiques two responses, and outputs comparative scores; (2) Use BRPO for RL training where one response from the same batch serves as the reference.
+- **Datasets**: In-house Chinese writing preference data (~10K pairs), WritingBench, in-house Writing Testset (211 queries).
+- **Results**: Writing-Zero (pure RL from base, no SFT) achieves 3.84 on Writing Testset, surpassing Qwen3-32B-Instruct (3.32) and DeepSeek-R1 (3.20). GenRM-based training produces 7x less reward hacking than scalar RM (58 vs 417 tokens of self-justification).
+- **Code**: Not released (proprietary).
+- **Relevance**: **Most directly relevant paper.** Demonstrates that pairwise self-critique can serve as a viable reward signal for creative writing RL, achieving competitive results without SFT. Key insight: structured critique (generating principles before scoring) is more robust than scalar rewards.
+
+### 2. Self-Rewarding Language Models
+- **Authors**: Yuan et al. (Meta/NYU), 2024
+- **Source**: arXiv:2401.10020
+- **Key Contribution**: A single LLM simultaneously acts as both instruction-follower and reward model, with both capabilities improving through iterative self-training via DPO.
+- **Methodology**: Seed model trained on IFT + EFT (evaluation fine-tuning) data. Each iteration: generate N=4 responses, self-score with 5-point rubric, create preference pairs (best vs worst), train with DPO.
+- **Datasets**: Open Assistant (3,200 IFT + 1,630 EFT examples), AlpacaEval 2.0, MT-Bench.
+- **Results**: After 3 iterations, MT-Bench writing score improves from 8.83→9.58 (strongest category gain). AlpacaEval win rate reaches 20.44%, surpassing Claude 2 and GPT-4 0613.
+- **Code**: Not released.
+- **Relevance**: **Core foundational paper.** Proves iterative self-reward improves LLM output quality, with writing showing the largest gains. However, response length inflates significantly (1,092→2,552 tokens), raising reward hacking concerns.
+
+### 3. Collective Critics for Creative Story Generation (CRITICS)
+- **Authors**: Bae &amp; Kim (UNIST), 2024
+- **Source**: arXiv:2410.02428, EMNLP 2024
+- **Key Contribution**: Multi-agent critique framework with diverse critics (3 for plans, 2 for text), adaptive personas, a leader for selection, and an evaluator for the creativity-coherence trade-off.
+- **Methodology**: Two stages: CRPLAN (critique story plan with 3 creativity criteria) and CRTEXT (critique individual sentences for imagery and voice). Each stage uses multiple rounds of critique with a leader selecting the best feedback.
+- **Datasets**: 300 premises from DOC dataset.
+- **Results**: +27pp improvement in creativity and interestingness over DOC baseline. Ablations show multiple criteria, personas, and leaders are all essential.
+- **Code**: Released at [GitHub](https://github.com/EMNLP-2024-CritiCS/Collective-Critics-for-Creative-Story-Generation)
+- **Relevance**: **Key counterpoint to our hypothesis.** Demonstrates that *single-agent* self-critique is insufficient; diverse multi-agent critique with structured roles is needed for meaningful creative improvement. Also shows creativity-coherence trade-off requiring careful management.
+
+### 4. Self-Refine: Iterative Refinement with Self-Feedback
+- **Authors**: Madaan et al. (CMU/Allen AI), 2023
+- **Source**: arXiv:2303.17651
+- **Key Contribution**: Foundational framework for LLM self-critique: generate → critique → refine loop, all with the same model, no training required.
+- **Methodology**: Single model generates output, provides structured feedback, then revises. Tested on 7 tasks.
+- **Results**: ~20% average improvement across tasks (5-40% range) using GPT-3.5 and GPT-4.
+- **Relevance**: Establishes that inference-time self-critique works for improving quality. However, this is test-time refinement, not training — the model doesn&#39;t permanently improve.
+
+### 5. Constitutional AI: Harmlessness from AI Feedback
+- **Authors**: Bai et al. (Anthropic), 2022
+- **Source**: arXiv:2212.08073
+- **Key Contribution**: Two-phase approach: (1) model self-critiques and revises outputs using written principles, (2) AI-generated preference labels train a reward model for RL (RLAIF).
+- **Relevance**: Establishes the paradigm of using AI feedback (including self-critique) as a substitute for human feedback in training loops.
+
+### 6. RLAIF vs. RLHF: Scaling Reinforcement Learning from Human Feedback with AI Feedback
+- **Authors**: Lee et al. (Google), 2023
+- **Source**: arXiv:2309.00267
+- **Key Contribution**: Systematic comparison showing RLAIF matches RLHF performance. Direct-RLAIF (bypassing reward model) actually outperforms standard RLAIF.
+- **Relevance**: Validates that AI-generated feedback is a viable substitute for human feedback — core justification for self-critique as reward signal.
+
+### 7. Spontaneous Reward Hacking in Iterative Self-Refinement
+- **Authors**: 2024
+- **Source**: arXiv:2407.04549
+- **Key Contribution**: Demonstrates that LLM evaluator ratings diverge from human judgments over refinement iterations — reward hacking emerges spontaneously without adversarial intent.
+- **Results**: Essay editing tasks show LLM evaluator scores increase while human quality assessments plateau or decline. Larger models and shared context amplify the problem.
+- **Relevance**: **Critical warning.** Self-critique loops for story writing may produce inflated quality scores that don&#39;t reflect actual improvement. Mitigation strategies are essential.
+
+### 8. No Free Lunch: Rethinking Internal Feedback for LLM Reasoning
+- **Authors**: 2025
+- **Source**: arXiv:2506.17219
+- **Key Contribution**: Examines when and why LLM self-critique fails to improve outputs, finding that internal feedback alone has fundamental limitations.
+- **Relevance**: Provides theoretical grounding for understanding the boundaries of self-critique effectiveness.
+
+### 9. EvolvR: Self-Evolving Pairwise Reasoning for Story Evaluation to Enhance Generation
+- **Authors**: 2025
+- **Source**: arXiv:2508.06046
+- **Key Contribution**: Framework to improve LLM-as-judge for story evaluation via self-synthesized CoT reasoning data with multi-persona strategy. The trained evaluator serves as a reward model for generation improvement.
+- **Results**: SOTA on StoryER, HANNA, and OpenMEVA benchmarks. When used as reward model, significantly improves story quality.
+- **Relevance**: **Directly relevant.** Shows a concrete pipeline from self-evolved story evaluation to generation improvement via reward modeling.
+
+### 10. PREFINE: Personalized Story Generation via Simulated User Critics
+- **Authors**: 2025
+- **Source**: arXiv:2510.21721
+- **Key Contribution**: Critique-and-refine framework for personalized story generation with simulated user agents and user-specific rubrics.
+- **Results**: Outperforms existing methods on PerDOC and PerMPST benchmarks.
+- **Relevance**: Demonstrates critique-refine loop applied specifically to story writing with personalized evaluation criteria.
+
+### 11. Small But Funny: A Feedback-Driven Approach to Humor Distillation
+- **Authors**: 2024
+- **Source**: arXiv:2402.18113
+- **Key Contribution**: Uses LLM feedback to distill humor-writing ability from large to small models through iterative refinement.
+- **Relevance**: Shows self-critique/feedback loops can improve a specific creative writing skill (humor), analogous to story quality.
+
+### 12. Evaluating Large Language Model Creativity from a Literary Perspective
+- **Authors**: 2023
+- **Source**: arXiv:2312.03746
+- **Key Contribution**: Framework for evaluating LLM creative writing using literary criticism and computational creativity criteria.
+- **Relevance**: Provides evaluation methodology essential for measuring story quality improvements.
+
+### 13. Direct Preference Optimization (DPO)
+- **Authors**: Rafailov et al. (Stanford), 2023
+- **Source**: arXiv:2305.18290
+- **Key Contribution**: Eliminates need for explicit reward model by extracting optimal policy directly from preference pairs via classification loss.
+- **Relevance**: Key training algorithm — self-critique-derived preference pairs (better/worse story pairs) can directly fine-tune the generator without a separate reward model.
+
+### 14. Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena
+- **Authors**: Zheng et al. (UC Berkeley/LMSYS), 2023
+- **Source**: arXiv:2306.05685
+- **Key Contribution**: Validates LLM-as-judge achieves &gt;80% agreement with humans. Identifies key biases: position bias, verbosity bias, self-enhancement bias.
+- **Relevance**: Establishes both the viability and the risks of using LLM self-evaluation as a quality signal for story writing.
+
+### 15. Large Language Models Can Self-Improve
+- **Authors**: Huang et al. (Google), 2022
+- **Source**: arXiv:2210.11610
+- **Key Contribution**: Uses CoT + self-consistency to generate pseudo-labels, then fine-tunes on own outputs.
+- **Results**: GSM8K: 74.4%→82.1% through self-generated training data alone.
+- **Relevance**: Demonstrates self-evaluation can generate training signal strong enough for genuine model improvement.
+
+### 16. Language Model Self-improvement by RL Contemplation
+- **Authors**: Zhang et al., 2023
+- **Source**: arXiv:2305.14483
+- **Key Contribution**: Unsupervised RL framework (SIRLC) where the LM assigns quality scores to its own outputs and optimizes to maximize those self-scores.
+- **Results**: ~5.6% accuracy on reasoning; BERTScore 0.82→0.86 on translation.
+- **Relevance**: Directly implements self-critique as RL reward, showing it works beyond reasoning to open-ended generation.
+
+### 17. Self-Evolved Reward Learning for LLMs
+- **Authors**: 2024
+- **Source**: arXiv:2411.00418
+- **Key Contribution**: Reward model generates additional training data to iteratively improve itself, reducing dependence on human-labeled preferences.
+- **Relevance**: Shows how self-generated feedback can bootstrap reward model quality alongside the generator.
+
+---
+
+## Common Methodologies
+
+### Self-Critique Approaches
+1. **Inference-time self-refinement** (Self-Refine): Generate → Critique → Revise loop. No training, immediate improvement, but no permanent learning.
+2. **Self-rewarding training loops** (Self-Rewarding LMs, Writing-Zero): Model generates preference data via self-evaluation, then trains on it via DPO/RL. Permanent improvement but risk of reward hacking.
+3. **Multi-agent critique** (CRITICS, PREFINE): Multiple specialized critic agents provide diverse feedback. More robust but more complex.
+4. **Constitutional/principle-based critique** (Constitutional AI, Writing-Zero SPCT): Self-critique guided by explicit principles or rubrics.
+
+### Training Paradigms
+- **DPO** (most common): Preference pairs from self-evaluation → direct policy optimization.
+- **GRPO/PPO**: RL with self-generated reward signal.
+- **BRPO** (Writing-Zero): Bootstrapped within-batch reference for RL on non-verifiable tasks.
+- **SFT on filtered outputs**: Fine-tune on high-quality self-generated examples only.
+
+---
+
+## Standard Baselines
+
+For story generation evaluation:
+- **DOC** (Detailed Outline Control): Hierarchical plan-then-generate pipeline
+- **Re3**: Recursive reprompting and revision for long stories
+- Standard LLMs (GPT-4, Claude, Llama) in zero/few-shot
+
+For self-improvement evaluation:
+- **SFT-only models**: Supervised fine-tuning without self-reward loop
+- **Scalar RM + GRPO/PPO**: Traditional reward model approach
+- **RLHF**: Human feedback baseline
+
+---
+
+## Evaluation Metrics
+
+### Automatic Metrics for Story Quality
+- **WritingBench** (Wu et al., 2025): 6 core domains, 100 subdomains (note: hackable per Writing-Zero)
+- **StoryER, HANNA, OpenMEVA**: Story evaluation benchmarks used by EvolvR
+- **MT-Bench writing category**: Part of broader instruction-following benchmark
+- **AlpacaEval**: General instruction-following win rate
+
+### LLM-as-Judge Metrics
+- GPT-4 pairwise comparison (most common)
+- Multi-criteria rubrics (creativity, coherence, interestingness, relevance)
+- Mozaffari&#39;s rubric: Image, Voice, Originality (used by CRITICS)
+
+### Human Evaluation
+- Pairwise preference comparisons (most reliable)
+- Multi-dimensional scoring (interesting, coherent, creative, relevant)
+- Inter-annotator agreement via Fleiss&#39; Kappa or Cohen&#39;s Kappa
+
+---
+
+## Gaps and Opportunities
+
+1. **No direct test of self-critique for English story writing**: Writing-Zero works on Chinese writing; CRITICS uses inference-time critique without training. No paper combines self-critique reward + RL/DPO specifically for English narrative fiction.
+
+2. **Reward hacking is under-addressed**: Spontaneous reward hacking paper shows the problem; Writing-Zero offers a partial solution (pairwise GenRM); but robust solutions for story-specific hacking (length, purple prose, cliché exploitation) are missing.
+
+3. **Creative dimensions poorly captured**: Most self-reward rubrics focus on helpfulness/correctness. Story-specific dimensions (plot coherence, character development, narrative arc, emotional impact, prose style) need specialized rubrics.
+
+4. **Small model capability**: Most work uses 70B+ models. Whether self-critique works for smaller models (7B-13B) on creative tasks is unclear.
+
+5. **Evaluation reliability**: LLM-as-judge for story quality has known biases. EvolvR addresses this but the trained evaluator hasn&#39;t been validated as a reward model for training loops.
+
+---
+
+## Recommendations for Our Experiment
+
+### Recommended Datasets
+1. **WritingPrompts** (Reddit, via HuggingFace): Large corpus of writing prompts with human-written stories — good for training and baseline comparison
+2. **HANNA** / **OpenMEVA**: Story evaluation benchmarks for measuring critique quality
+3. **DOC premises** (300 premises): Standard evaluation set for story generation
+
+### Recommended Baselines
+1. **No self-critique**: Direct generation (temperature sampling)
+2. **Self-Refine** (inference-time): Single-pass self-critique + revision
+3. **Multi-iteration self-reward + DPO**: Following Self-Rewarding LMs methodology
+4. **Multi-agent critique**: Following CRITICS methodology
+
+### Recommended Metrics
+1. **Human pairwise preference**: Gold standard
+2. **GPT-4 pairwise comparison**: Scalable proxy
+3. **Multi-criteria scoring**: Creativity, coherence, interestingness, character, plot (5-point scales)
+4. **Reward hacking indicators**: Response length, self-justification length, diversity metrics
+
+### Methodological Considerations
+- Use **pairwise** comparison rather than scalar scoring to reduce reward hacking (per Writing-Zero)
+- Design **story-specific rubrics** covering narrative dimensions, not just general quality
+- Monitor for **length inflation** and **style collapse** across iterations
+- Consider **multi-criteria critique** rather than single-dimension evaluation
+- Include **diversity metrics** to detect mode collapse
+- Use **held-out human evaluation** as ground truth, not just LLM-as-judge scores
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          PAPER REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+Generate a complete academic paper with the following structure:
+
+1. TITLE
+   - Clear, specific, informative
+   - Should convey main finding or contribution
+
+2. AUTHOR
+   - Use this exact author line in the \author{} block: Ari Holtzman and NeuriCo
+
+3. ABSTRACT (150-250 words)
+   - Problem statement
+   - Approach
+   - Key results
+   - Significance
+
+4. INTRODUCTION
+   - Research problem and motivation
+   - Gap in existing work
+   - Our contribution (be specific)
+   - Paper organization
+
+5. RELATED WORK
+   - Organized by theme/approach
+   - Position our work relative to prior work
+   - Cite papers from literature review
+
+6. METHODOLOGY
+   - Clear description of approach
+   - Experimental setup
+   - Datasets used
+   - Evaluation metrics
+   - Baselines
+
+7. RESULTS
+   - Present results with tables and figures
+   - Statistical analysis
+   - Comparison to baselines
+   - Ablation studies (if applicable)
+
+8. DISCUSSION
+   - Interpretation of results
+   - Limitations
+   - Broader implications
+
+9. CONCLUSION
+   - Summary of contributions
+   - Key findings
+   - Future work
+
+10. REFERENCES
+   - BibTeX format
+   - All cited papers
+
+════════════════════════════════════════════════════════════════════════════════
+                          OUTPUT FORMAT
+════════════════════════════════════════════════════════════════════════════════
+
+Create a MODULAR LaTeX project with the following directory structure:
+
+paper_draft/
+├── main.tex              # Main file that imports all sections
+├── references.bib        # BibTeX references
+├── sections/
+│   ├── abstract.tex      # Abstract content
+│   ├── introduction.tex  # Introduction section
+│   ├── related_work.tex  # Related work section
+│   ├── methodology.tex   # Methodology section
+│   ├── results.tex       # Results section
+│   ├── discussion.tex    # Discussion section
+│   └── conclusion.tex    # Conclusion section
+├── figures/              # Directory for any generated figures
+├── tables/               # Directory for complex standalone tables
+└── appendix/             # Directory for appendix sections (if needed)
+
+INSTRUCTIONS:
+1. First, create the directory structure above (mkdir -p paper_draft/sections paper_draft/figures paper_draft/tables paper_draft/appendix)
+2. Write main.tex using the EXACT preamble for NEURIPS:
+
+   \documentclass{article}
+   \usepackage[final]{neurips_2025}  % NEURIPS style (neurips_2025.sty is in paper_draft/)
+   \usepackage[hidelinks]{hyperref}  % REQUIRED: clickable links
+   \usepackage{booktabs}  % REQUIRED: professional tables
+   \usepackage{graphicx}
+   \usepackage{amsmath,amssymb}
+
+   % Import command files
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+   % Use this bibliography style:
+   \bibliographystyle{plainnat}
+
+   \author{Ari Holtzman and NeuriCo}
+
+   - Use \input{sections/...} to include each section
+   - Use \bibliography{references} for references
+3. Write each section file with COMPLETE content (no placeholders)
+4. Each section file should include its \section{} command
+5. Write references.bib with all citations in BibTeX format
+6. After writing all files, compile the paper:
+   cd paper_draft && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex
+
+This modular structure allows humans to easily:
+- Edit individual sections without navigating a large file
+- Track changes per section
+- Reuse sections across different paper versions
+
+════════════════════════════════════════════════════════════════════════════════
+                          QUALITY REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+- Academic tone throughout
+- All claims must be supported by data from the experiment report
+- Proper citations using \cite{} commands
+- Clear figures and tables with proper captions
+- NO placeholder text - every section must have real content
+- The paper MUST compile without errors
+- If compilation fails, debug and fix the LaTeX errors
+
+════════════════════════════════════════════════════════════════════════════════
+                          LAB WRITING STYLE
+════════════════════════════════════════════════════════════════════════════════
+
+Follow these lab-specific conventions to match our paper style:
+
+1. LANGUAGE STYLE:
+   - Use active voice: "We propose", "We examine", "We focus on"
+   - Be direct and confident: "Our main question is...", "We hypothesize that..."
+   - State things clearly and simply - prefer plain language over jargon
+   - Use bold questions as paragraph organizers: {\bf what is X?}
+   - Include specific quantitative claims: "8.97% over baseline"
+   - Avoid fancy wording: "utilize" → "use", "facilitate" → "help"
+
+2. INTRODUCTION STRUCTURE:
+   - Engaging hook (get to the point quickly)
+   - Problem importance
+   - Gap identification
+   - Your approach with method figure reference
+   - Quantitative preview of results
+   - Contribution bullets (3-4 items, action verbs)
+
+3. CONTRIBUTION LISTS:
+   \begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+       \item We propose...
+       \item We conduct...
+       \item We complement...
+   \end{itemize}
+
+4. MODULAR COMMANDS STRUCTURE:
+   Command templates are pre-copied to paper_draft/commands/:
+   - math.tex: Math notation macros
+   - general.tex: Formatting macros
+   - macros.tex: Project-specific term definitions (customize this for your paper)
+
+   In main.tex, include:
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+5. REFERENCE CONVENTIONS:
+   Use reference macros from math.tex:
+   - \figref{fig:name} for "figure 1" (lowercase, in-sentence)
+   - \Figref{fig:name} for "Figure 1" (capitalized, start of sentence)
+   - \secref{sec:name} for "section 2"
+
+6. TEXT FORMATTING:
+   - Use \para{Header text} for bold paragraph headers
+   - Define method/dataset names with \textsc and \xspace:
+     \newcommand{\methodname}{\textsc{MethodName}\xspace}
+
+7. TABLE FORMATTING:
+   - Use booktabs package (no vertical lines)
+   - Use \resizebox{\textwidth}{!}{...} for wide tables
+   - Use @{} to remove padding at table edges
+   - Use \cmidrule(lr){x-y} for sub-headers
+   - Use \textsc{} for dataset/method names in headers
+   - Bold best results with {\bf ...}
+
+8. FIGURE FORMATTING:
+   - Use 0.32\textwidth for 3-column subfigures
+   - Use 0.95\linewidth for full-width figures
+   - Use \input{figures/legend} for shared legends
+   - Write self-contained captions explaining key observations
+
+9. RESULTS PRESENTATION:
+   - Define \increase and \decrease for colored arrows (green up, red down)
+   - Bold best results in tables
+   - Report confidence intervals when available
+
+10. ALGORITHM STYLING:
+    - Use algpseudocode with [noend]
+    - Use \triangleright for comments
+
+11. HYPERLINKS (REQUIRED):
+    - Always use \usepackage[hidelinks]{hyperref} or with colored links
+    - All citations, section refs, figure refs, table refs must be clickable
+    - This is essential for reader navigation
+
+════════════════════════════════════════════════════════════════════════════════
+                          WORKFLOW: REVIEW AND REFLECT
+════════════════════════════════════════════════════════════════════════════════
+
+Before calling finish, you MUST complete these review steps:
+
+1. REVIEW RESOURCES (at the start):
+   - Read .claude/skills/paper-writer/SKILL.md for detailed guidance
+   - Study templates/paper_writing/lab_style_guide.md for style conventions
+   - Browse paper_examples/ for formatting and language patterns
+
+2. SELF-REFLECTION (before finishing):
+   After writing all sections, review your work against these criteria:
+
+   LANGUAGE CHECK:
+   - [ ] Is the writing clear and jargon-free?
+   - [ ] Are claims specific with quantitative support?
+   - [ ] Is active voice used throughout?
+
+   FORMATTING CHECK:
+   - [ ] Does main.tex include \input{commands/math}, \input{commands/general}, \input{commands/macros}?
+   - [ ] Is hyperref package included for clickable references?
+   - [ ] Do tables use booktabs (no vertical lines)?
+   - [ ] Are best results bolded in tables?
+   - [ ] Are figures/tables properly captioned?
+
+   STRUCTURE CHECK:
+   - [ ] Does introduction follow: hook → importance → gap → approach → preview → contributions?
+   - [ ] Are contribution bullets specific with action verbs?
+   - [ ] Does the paper compile without errors?
+
+3. FIX ISSUES:
+   - Address any issues found in the self-reflection
+   - Re-compile and verify the PDF looks correct
+
+Only after completing this review should you consider the paper finished.

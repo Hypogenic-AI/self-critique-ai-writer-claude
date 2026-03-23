@@ -1,0 +1,52 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\para{Why does one iteration suffice?}
+The first critique identifies the most salient weaknesses---predictable plot choices, underdeveloped characters, missed emotional beats---and the revision addresses them directly.
+By iteration 2, the remaining issues are subtler, and the critique provides less actionable feedback.
+By iteration 3, we observe signs of overcorrection: coherence declines ($-0.20$) as the model introduces plot elements to satisfy creative critique at the expense of narrative consistency.
+This pattern aligns with the diminishing returns observed in Self-Refine across other tasks~\citep{madaan2023selfrefine} and with concerns about iterative self-refinement diverging from human quality judgments~\citep{pan2024rewardhacking}.
+
+\para{Why does self-selection fail?}
+The failure of \bestofn without refinement is striking and practically important.
+The model generates four stories with genuine diversity, yet cannot reliably identify the best one.
+This suggests that \emph{critique} (identifying specific weaknesses) and \emph{ranking} (holistic quality comparison) are distinct capabilities, and that \gptfour is substantially better at the former.
+When \bestofn is combined with one refinement pass, performance recovers to 87\% win rate---comparable to \selfrefine $\times$2---indicating that starting from a better initial story (via selection) and then refining it is a valid alternative strategy.
+
+\para{What does self-critique unlock?}
+The dimension-level analysis (\secref{sec:dimensions}) reveals that self-critique primarily improves creative dimensions: originality, character depth, and emotional resonance.
+Coherence, which is already at ceiling, does not benefit.
+This pattern suggests that LLMs possess latent creative capacity---knowledge of what would make a more interesting, surprising, or emotionally affecting story---that they do not express in first drafts.
+Default generation tends toward ``safe'' choices; structured self-reflection provides the model an opportunity to recognize and correct this conservatism.
+This interpretation aligns with findings from \citet{jia2025writingzero}, who observed that self-critique-based training pushes models toward more creative outputs.
+
+\para{Comparison with multi-agent approaches.}
+\citet{bae2024critics} argued that single-agent critique is insufficient for creative improvement, advocating for multi-agent systems with diverse critic personas.
+Our results partially challenge this claim: single-agent self-critique with a structured rubric produces very large improvements ($d = 2.02$) in a controlled blind evaluation.
+However, the two setups are not directly comparable---\textsc{CritiCS} targets longer, more complex narratives and uses a different evaluation protocol.
+Whether multi-agent critique offers additional gains \emph{on top of} structured single-agent critique for short fiction remains an open question.
+
+\subsection{Limitations}
+\label{sec:limitations}
+
+\para{Same model for all roles.}
+We use \gptfour for generation, critique, and evaluation.
+While we employ different temperatures, seeds, and separate contexts for each role, shared model biases may inflate perceived improvement.
+The model may systematically favor the kinds of revisions it tends to make, creating a feedback loop that does not reflect genuine quality gains.
+Human evaluation on a subset of stories would substantially strengthen these findings.
+
+\para{Single model family.}
+Our results are specific to \gptfour and may not generalize to other architectures.
+Open-source models and smaller models may lack the capacity for effective self-critique, as the critic must be sophisticated enough to identify genuine weaknesses.
+
+\para{Inference-time only.}
+We test self-critique at inference time; the model does not permanently learn from its critiques.
+Training-time approaches~\citep{jia2025writingzero, yuan2024selfrewarding} may yield larger or more durable improvements.
+
+\para{Scale of evaluation.}
+Our 15 prompts are sufficient for detecting the large effects we observe but provide limited statistical power for subtler analyses (\eg comparing \selfrefine $\times$1 against $\times$2).
+A larger prompt set would yield tighter confidence intervals.
+
+\para{Short fiction only.}
+We test stories of 400--600 words.
+Self-critique effectiveness for longer narratives---where structural coherence becomes more challenging and single-pass revision may be insufficient---is untested.

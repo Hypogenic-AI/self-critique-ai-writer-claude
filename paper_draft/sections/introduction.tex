@@ -1,0 +1,31 @@
+\section{Introduction}
+\label{sec:intro}
+
+Large language models write fluent prose, yet their first-draft fiction tends toward safe, predictable choices.
+A human author's instinct is to revise---to re-read, identify weaknesses, and rewrite.
+Can an LLM do the same?
+If self-critique alone can meaningfully improve story quality, it would enable autonomous writing improvement without costly human annotation, making high-quality AI writing assistance broadly accessible.
+
+\para{The gap.}
+Prior work has demonstrated that self-critique improves tasks with verifiable answers such as mathematics and code~\citep{madaan2023selfrefine}, and that multi-agent critique pipelines enhance creative writing~\citep{bae2024critics}.
+However, creative writing lacks ground truth, making it unclear whether a single model's internal feedback provides a genuine quality signal or merely reinforces its own biases.
+\citet{jia2025writingzero} showed that self-critique can train Chinese writing models via reinforcement learning, but no study has systematically measured how much a single LLM improves English narrative fiction through inference-time self-refinement across multiple iteration depths.
+
+\para{Our approach.}
+We design a controlled experiment using \gptfour as both the story writer and self-critic.
+For each of 15 diverse fiction prompts from the \writingprompts dataset, we generate stories under six conditions spanning zero to three \critiquerevise iterations, \bestofn self-selection, and their combination.
+A separate \gptfour instance serves as a blind pairwise judge, evaluating stories across six HANNA-inspired dimensions~\citep{chhun2022hanna} with randomized presentation order to control for position bias.
+\Figref{fig:trajectory} illustrates the core finding: a single \critiquerevise iteration captures nearly all achievable improvement.
+
+\para{Preview of results.}
+One round of self-critique achieves an 80\% win rate over uncritiqued baselines ($p < 0.001$, Cohen's $d = 2.02$), with the largest gains in creativity (+0.93) and character development (+0.87).
+Additional iterations yield diminishing returns, and self-selection without structured critique is largely ineffective (60\% win rate, $p = 0.80$).
+We find no evidence of reward hacking: length inflation is mild (+11\%) and lexical diversity slightly increases.
+
+Our contributions are:
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+    \item We conduct the first systematic study of inference-time self-critique for English narrative fiction, measuring improvement across six quality dimensions and three iteration depths.
+    \item We demonstrate that a single \critiquerevise loop produces large, statistically significant improvements (Cohen's $d = 2.02$), while additional iterations offer diminishing returns.
+    \item We show that structured critique, not generation diversity, drives improvement: \bestofn self-selection without revision is ineffective, challenging the assumption that LLMs can reliably rank their own creative outputs.
+    \item We analyze reward hacking indicators and find that self-critique improves lexical diversity rather than inflating superficial metrics.
+\end{itemize}

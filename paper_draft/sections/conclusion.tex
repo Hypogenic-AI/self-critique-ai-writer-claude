@@ -1,0 +1,15 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We have conducted the first systematic study of inference-time self-critique for LLM story writing, measuring improvement across six quality dimensions, three iteration depths, and two strategy families (\selfrefine vs.\ \bestofn).
+Our central finding is that a single \critiquerevise iteration produces a large, statistically significant improvement in story quality (80\% win rate, Cohen's $d = 2.02$), with the strongest gains in creativity and character development.
+Additional iterations offer diminishing returns, and self-selection without structured critique is largely ineffective.
+
+These results carry a clear practical message: applications using LLMs for creative writing should implement one self-critique pass by default.
+This costs only 3$\times$ the base generation cost but produces dramatically better output.
+More iterations are not cost-effective.
+
+Our findings also suggest a broader insight about LLM creative capacity.
+The model \emph{knows} what would make a better story---more original premises, deeper characters, stronger emotional beats---but does not produce it in first drafts.
+Structured self-reflection provides a mechanism to surface and act on this latent knowledge.
+The challenge for future work is to determine whether this insight extends to longer narratives, other creative domains, and weaker models, and whether training-time integration of self-critique can produce permanent improvements in creative quality.

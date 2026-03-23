@@ -1,0 +1,33 @@
+\section{Related Work}
+\label{sec:related}
+
+\para{Self-refinement at inference time.}
+\citet{madaan2023selfrefine} introduced the \selfrefine framework, in which a single LLM iteratively generates, critiques, and revises its output without additional training.
+They report roughly 20\% average improvement across seven tasks, though their analysis of creative writing is limited.
+\citet{huang2022selfimprove} showed that LLMs can self-improve on reasoning tasks by fine-tuning on their own high-confidence outputs.
+More recently, \citet{zhang2023contemplation} proposed an unsupervised RL framework where the model scores its own outputs and optimizes against those self-scores, achieving gains on both reasoning and open-ended generation.
+Our work focuses specifically on narrative fiction, measuring self-refinement depth and contrasting it with self-selection strategies.
+
+\para{Self-rewarding and self-training.}
+\citet{yuan2024selfrewarding} demonstrated that a single LLM can simultaneously serve as instruction-follower and reward model, with both capabilities improving through iterative DPO training.
+Their strongest gains appeared in the writing category of MT-Bench, though response length inflated by 2.3$\times$---a potential sign of reward hacking.
+\citet{jia2025writingzero} addressed this for Chinese writing by introducing a generative reward model that produces pairwise critiques rather than scalar scores, reducing reward hacking by 7$\times$.
+\citet{chen2024selfrewarding} further showed that self-evolved reward learning can bootstrap reward model quality alongside the generator.
+Unlike these training-time approaches, we study inference-time self-critique, where the model does not permanently learn from its critiques.
+
+\para{Critique for creative writing.}
+\citet{bae2024critics} proposed \textsc{CritiCS}, a multi-agent framework with diverse critic personas for story generation.
+They found that single-agent critique was insufficient and that multiple specialized critics were essential for meaningful creative improvement.
+\citet{wu2025prefine} applied critique-and-refine specifically to personalized story generation with simulated user agents.
+\citet{chen2025evolvr} developed a self-evolving pairwise reasoning approach for story evaluation, achieving state-of-the-art results on multiple story benchmarks and demonstrating that improved evaluation translates to improved generation when used as a reward model.
+Our work differs in that we isolate single-model self-critique without multi-agent setups or training-time adaptation, directly measuring what one round of honest self-reflection achieves.
+
+\para{LLM-as-judge and evaluation bias.}
+Using LLMs to evaluate LLM outputs has become widespread~\citep{zheng2023judging}, but introduces known biases: position bias, verbosity bias, and self-enhancement bias.
+\citet{pan2024rewardhacking} demonstrated that LLM evaluator scores can diverge from human judgments over refinement iterations, a phenomenon they call spontaneous reward hacking.
+We mitigate these concerns through position randomization, separate evaluation contexts, and explicit instructions against favoring longer stories, though we acknowledge that shared model biases between generator and judge remain a limitation.
+
+\para{Constitutional AI and RLAIF.}
+\citet{bai2022constitutional} established the paradigm of using AI-generated feedback---including self-critique---as a substitute for human feedback in training loops.
+\citet{lee2023rlaif} systematically compared RLAIF with RLHF and found comparable performance, validating AI feedback as a viable reward signal.
+These works provide the theoretical foundation for self-critique as a quality signal, which we test in the specific domain of narrative fiction.
