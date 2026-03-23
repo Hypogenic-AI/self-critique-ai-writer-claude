@@ -1,0 +1,22 @@
+idea:
+  title: Is self-critique enough to get good AI story writers?
+  domain: artificial_intelligence
+  hypothesis: 'Large language models can significantly improve their story writing
+    abilities by using self-critique as their own reward function, without external
+    feedback.
+
+    '
+  background:
+    description: 'How much better could an LLM story writer get simply by being its
+      own reward function, by self-critiquing its own writing?
+
+      '
+  metadata:
+    author: Ari Holtzman
+    source: IdeaHub
+    source_url: https://hypogenic.ai/ideahub/idea/p8195H31biypaod7u4e3
+    idea_id: is_self_critique_enough_to_get_20260323_080833_6cd66a94
+    created_at: '2026-03-23T08:08:33.423049'
+    status: submitted
+    github_repo_name: self-critique-ai-writer-claude
+    github_repo_url: https://github.com/Hypogenic-AI/self-critique-ai-writer-claude
